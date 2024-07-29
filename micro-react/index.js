@@ -1,3 +1,3 @@
 import createElement from "./createElement.js";
-
-export {createElement};
+import render from "./render.js";
+export {createElement, render};
