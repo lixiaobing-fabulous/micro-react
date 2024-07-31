@@ -55,15 +55,27 @@ function updateDOM(dom, prevProps, nextProps) {
         });
 }
 
+function commitDeletion(fiber, domParent) {
+    if (fiber.dom) {
+        domParent.removeChild(fiber.dom);
+    } else {
+        commitDeletion(fiber.child, domParent);
+    }
+}
+
 function commitWork(fiber) {
     if (!fiber) {
         return;
     }
-    const domParent = fiber.parent.dom;
+    let domParentFiber = fiber.parent;
+    while (!domParentFiber.dom) {
+        domParentFiber = domParentFiber.parent;
+    }
+    const domParent = domParentFiber.dom;
     if (fiber.effectTag === 'PLACEMENT' && fiber.dom) {
         domParent.append(fiber.dom);
     } else if (fiber.effectTag === 'DELETION' && fiber.dom) {
-        domParent.removeChild(fiber.dom);
+        commitDeletion(domParent, fiber);
     } else if (fiber.effectTag === 'UPDATE') {
         updateDOM(fiber.dom, fiber.alternate.props, fiber.props);
     }
@@ -161,12 +173,26 @@ function reconcileChildren(wipFiber, elements) {
     }
 }
 
-// 执行一个渲染单元任务，并返回新的任务
-function performUnitOfWork(fiber) {
+function updateHostComponent(fiber) {
     if (!fiber.dom) {
         fiber.dom = createDOM(fiber);
     }
     reconcileChildren(fiber, fiber.props.children);
+}
+
+function updateFunctionComponent(fiber) {
+    const children = [fiber.type(fiber.props)];
+    reconcileChildren(fiber, children);
+}
+
+// 执行一个渲染单元任务，并返回新的任务
+function performUnitOfWork(fiber) {
+    const isFunctionComponent = fiber.type instanceof Function;
+    if (isFunctionComponent) {
+        updateFunctionComponent(fiber);
+    } else {
+        updateHostComponent(fiber);
+    }
     // 如果有child就返回child
     if (fiber.child) {
         return fiber.child;
