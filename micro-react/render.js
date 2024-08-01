@@ -1,7 +1,6 @@
 function createDOM(fiber) {
     // 创建dom对象
-    const dom = fiber.type === 'TEXT_ELEMENT' ? document.createTextNode('')
-        : document.createElement(fiber.type);
+    const dom = fiber.type === 'TEXT_ELEMENT' ? document.createTextNode('') : document.createElement(fiber.type);
 
     // 赋值属性
     Object.keys(fiber.props)
@@ -87,12 +86,9 @@ function commitWork(fiber) {
 function render(element, container) {
     // Root fiber
     wipRoot = {
-        dom: container,
-        props: {
+        dom: container, props: {
             children: [element],
-        },
-        child: null,
-        alternate: currentRoot,
+        }, child: null, alternate: currentRoot,
     };
     deletion = []
     nextUnitOfWork = wipRoot;
@@ -173,6 +169,7 @@ function reconcileChildren(wipFiber, elements) {
     }
 }
 
+
 function updateHostComponent(fiber) {
     if (!fiber.dom) {
         fiber.dom = createDOM(fiber);
@@ -180,7 +177,13 @@ function updateHostComponent(fiber) {
     reconcileChildren(fiber, fiber.props.children);
 }
 
+let wipFiber = null;
+let hookIndex = null;
+
 function updateFunctionComponent(fiber) {
+    wipFiber = fiber;
+    hookIndex = 0;
+    wipFiber.hooks = []
     const children = [fiber.type(fiber.props)];
     reconcileChildren(fiber, children);
 }
@@ -209,6 +212,32 @@ function performUnitOfWork(fiber) {
     }
 
 
+}
+
+export function useState(initial) {
+    const oldHook = wipFiber.alternate && wipFiber.alternate.hooks && wipFiber.alternate.hooks[hookIndex];
+    const hook = {
+        state: oldHook ? oldHook.state : initial,
+        queue: []
+    }
+    const actions = oldHook ? oldHook.queue : [];
+    actions.forEach(action => {
+        hook.state = action(hook.state);
+    })
+
+    const setState = (action) => {
+        hook.queue.push(action);
+        wipRoot = {
+            dom: currentRoot.dom,
+            props: currentRoot.props,
+            alternate: currentRoot,
+        };
+        nextUnitOfWork = wipRoot;
+        deletion = []
+    }
+    wipFiber.hooks.push(hook);
+    hookIndex++;
+    return [hook.state, setState]
 }
 
 export default render;
